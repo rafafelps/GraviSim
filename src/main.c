@@ -1,5 +1,7 @@
 #include <raylib.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define G 6.6743e-11
 
@@ -20,8 +22,9 @@ const int screenWidth = screenRatio * screenHeight;
 Body earth;
 Body moon;
 char stopEvents = 0;
-float scale = 0;
-float norm = 0;
+float distance = 384467e3;
+float ratio = 0;
+float t = 0;
 
 void update();
 void render();
@@ -29,7 +32,7 @@ void initEarth();
 void initMoon();
 int collided();
 
-int main(void) {
+int main() {
     InitWindow(screenWidth, screenHeight, "GraviSim");
     SetTargetFPS(60);
 
@@ -38,11 +41,11 @@ int main(void) {
 
     while (!WindowShouldClose()) {
         if (IsKeyReleased(KEY_A)) {
-            moon.vlc.x *= 0.95;
-            moon.vlc.y *= 0.95;
+            distance *= 0.9; 
         } else if (IsKeyReleased(KEY_D)) {
-            moon.vlc.x *= 1.05;
-            moon.vlc.y *= 1.05;
+            distance *= 1.1;
+        } else if (IsKeyReleased(KEY_R)) {
+            distance = 384467e3;
         }
 
         if (!stopEvents) {
@@ -61,29 +64,24 @@ int main(void) {
 
 void update() {
     if (!collided()) {
-        Vector2 vers = {earth.pos.x - moon.pos.x, earth.pos.y - moon.pos.y};
-        float sz = sqrtf(powf(vers.x, 2) + powf(vers.y, 2));
+        moon.pos.x = screenWidth * 0.5 + (distance * ratio) * cosf(t * (PI / 180.0));
+        moon.pos.y = screenHeight * 0.5 + (distance * ratio) * -sinf(t * (PI / 180.0));
 
-        // Normalizing vector
-        vers.x /= sz;
-        vers.y /= sz;
+        t += (0.2 * 384467e3) / distance;
+        if (t >= 360) { t = 0; }
+    } else {
+        distance *= 1.1;
 
-        sz *= scale; // unsigned int EMDistance = 384467e3;
-
-        float gravitationalForce = (G * earth.mass * moon.mass * 1e48) / powf(sz, 2);
-        float acl = gravitationalForce / (moon.mass * 1e24);
-
-        moon.vlc.x += acl * vers.x;
-        moon.vlc.y += acl * vers.y;
-
-        moon.pos.x += moon.vlc.x;
-        moon.pos.y += moon.vlc.y;
-    } else { stopEvents = 1; SetTargetFPS(1); }
+        moon.pos.x = screenWidth * 0.5 + (distance * ratio) * cosf(t * (PI / 180.0));
+        moon.pos.y = screenHeight * 0.5 + (distance * ratio) * -sinf(t * (PI / 180.0));
+    }
 }
 
 void render() {
     BeginDrawing();
     ClearBackground(BLACK);
+
+    DrawCircleLines(earth.pos.x, earth.pos.y, distance * ratio, WHITE);
     
     Vector2 tmp = earth.pos;
     tmp.x -= earth.texture.width * 0.5;
@@ -95,14 +93,31 @@ void render() {
     tmp.y -= moon.texture.height * 0.5;
     DrawTextureV(moon.texture, tmp, WHITE);
 
+    DrawText("Orbital Velocity:", 0.8 * screenWidth, 0.8 * screenHeight, screenHeight * (25.0 / 720), WHITE);
+    float oVl = sqrtf(G * earth.mass * 1e24 / distance);
+    int len = snprintf(NULL, 0, "%f", oVl);
+    char *info = malloc(len + 1);
+    snprintf(info, len + 1, "%f", oVl);
+    DrawText(info, 0.85 * screenWidth, 0.85 * screenHeight, screenHeight * (25.0 / 720), WHITE);
+    free(info);
+
+    DrawText("Distance: ", 0.8 * screenWidth, 0.7 * screenHeight, screenHeight * (25.0 / 720), WHITE);
+    len = snprintf(NULL, 0, "%f", distance);
+    info = malloc(len + 1);
+    snprintf(info, len + 1, "%f", distance);
+    for (int i = 0; info[i] != '\0'; i++) {
+        if (info[i] == '.') { info[i] = '\0'; break; }
+    }
+    DrawText(info, 0.85 * screenWidth, 0.75 * screenHeight, screenHeight * (25.0 / 720), WHITE);
+    free(info);
+
+
     EndDrawing();
 }
 
 void initEarth() {
     earth.mass = 5.9724;
     earth.radius = 6371;
-    earth.vlc = (Vector2){0, 0};
-    earth.acl = (Vector2){0, 0};
 
     Image img = LoadImage("res/earth.png");
     ImageResize(&img, screenWidth / 7.0, screenWidth / 7.0);
@@ -116,8 +131,6 @@ void initEarth() {
 void initMoon() {
     moon.mass = 0.07346;
     moon.radius = 1737.4;
-    moon.vlc = (Vector2){0, -0.92};
-    moon.acl = (Vector2){0, 0};
 
     Image img = LoadImage("res/moon.png");
     ImageResize(&img, earth.texture.width * ((float)(moon.radius) / earth.radius), earth.texture.width * ((float)(moon.radius) / earth.radius));
@@ -127,9 +140,7 @@ void initMoon() {
     moon.pos.x = screenWidth * 0.5 + earth.texture.width * 0.5 + moon.texture.width * 4.5;
     moon.pos.y = screenHeight * 0.5;
 
-    float sz = moon.pos.x - earth.pos.x;
-    scale = 384467e3 / sz;
-    norm = - sqrtf(G * (earth.mass * 1e24 + moon.mass * 1e24) / (sz * scale));
+    ratio = (earth.texture.width * 0.5 + moon.texture.width * 4.5) / distance;
 }
 
 int collided() {
