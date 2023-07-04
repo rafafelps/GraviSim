@@ -20,6 +20,8 @@ const int screenWidth = screenRatio * screenHeight;
 Body earth;
 Body moon;
 char stopEvents = 0;
+float scale = 0;
+float norm = 0;
 
 void update();
 void render();
@@ -29,14 +31,23 @@ int collided();
 
 int main(void) {
     InitWindow(screenWidth, screenHeight, "GraviSim");
-    SetTargetFPS(200);
+    SetTargetFPS(60);
 
     initEarth();
     initMoon();
 
     while (!WindowShouldClose()) {
+        if (IsKeyReleased(KEY_A)) {
+            moon.vlc.x *= 0.95;
+            moon.vlc.y *= 0.95;
+        } else if (IsKeyReleased(KEY_D)) {
+            moon.vlc.x *= 1.05;
+            moon.vlc.y *= 1.05;
+        }
+
         if (!stopEvents) {
-            update();
+            for (int i = 0; i < 3; i++)
+                update();
         }
         render();
     }
@@ -57,27 +68,16 @@ void update() {
         vers.x /= sz;
         vers.y /= sz;
 
-        sz = 384467e3; // unsigned int EMDistance = 384467;
-
-        Vector2 tg = {-vers.y, vers.x};
+        sz *= scale; // unsigned int EMDistance = 384467e3;
 
         float gravitationalForce = (G * earth.mass * moon.mass * 1e48) / powf(sz, 2);
         float acl = gravitationalForce / (moon.mass * 1e24);
 
-        vers.x *= sqrtf(acl * sz);
-        vers.y *= sqrtf(acl * sz);
+        moon.vlc.x += acl * vers.x;
+        moon.vlc.y += acl * vers.y;
 
-        float orbitalVelocity = sqrtf(G * (earth.mass * 1e24 + moon.mass * 1e24) / sz);
-        tg.x *= orbitalVelocity;
-        tg.y *= orbitalVelocity;
-
-        moon.vlc.x = tg.x + vers.x;
-        moon.vlc.y = tg.y + vers.y;
-
-        sz = sqrtf(powf(moon.vlc.x, 2) + powf(moon.vlc.y, 2));
-
-        moon.pos.x += moon.vlc.x / sz * 2.0;
-        moon.pos.y += moon.vlc.y / sz * 2.0;
+        moon.pos.x += moon.vlc.x;
+        moon.pos.y += moon.vlc.y;
     } else { stopEvents = 1; SetTargetFPS(1); }
 }
 
@@ -116,7 +116,7 @@ void initEarth() {
 void initMoon() {
     moon.mass = 0.07346;
     moon.radius = 1737.4;
-    moon.vlc = (Vector2){0, 0};
+    moon.vlc = (Vector2){0, -0.92};
     moon.acl = (Vector2){0, 0};
 
     Image img = LoadImage("res/moon.png");
@@ -126,6 +126,10 @@ void initMoon() {
 
     moon.pos.x = screenWidth * 0.5 + earth.texture.width * 0.5 + moon.texture.width * 4.5;
     moon.pos.y = screenHeight * 0.5;
+
+    float sz = moon.pos.x - earth.pos.x;
+    scale = 384467e3 / sz;
+    norm = - sqrtf(G * (earth.mass * 1e24 + moon.mass * 1e24) / (sz * scale));
 }
 
 int collided() {
