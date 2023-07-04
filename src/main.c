@@ -19,6 +19,7 @@ const int screenHeight = 720;
 const int screenWidth = screenRatio * screenHeight;
 Body earth;
 Body moon;
+char stopEvents = 0;
 
 void update();
 void render();
@@ -34,8 +35,9 @@ int main(void) {
     initMoon();
 
     while (!WindowShouldClose()) {
-        update();
-
+        if (!stopEvents) {
+            update();
+        }
         render();
     }
 
@@ -65,9 +67,9 @@ void update() {
         vers.x *= sqrtf(acl * sz);
         vers.y *= sqrtf(acl * sz);
 
-        float orbitalVelocity = sqrtf(G * earth.mass * 1e24 / sz);
-        tg.x *= sz;
-        tg.y *= sz;
+        float orbitalVelocity = sqrtf(G * (earth.mass * 1e24 + moon.mass * 1e24) / sz);
+        tg.x *= orbitalVelocity;
+        tg.y *= orbitalVelocity;
 
         moon.vlc.x = tg.x + vers.x;
         moon.vlc.y = tg.y + vers.y;
@@ -76,7 +78,7 @@ void update() {
 
         moon.pos.x += moon.vlc.x / sz * 2.0;
         moon.pos.y += moon.vlc.y / sz * 2.0;
-    }
+    } else { stopEvents = 1; SetTargetFPS(1); }
 }
 
 void render() {
